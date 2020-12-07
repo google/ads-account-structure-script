@@ -365,23 +365,6 @@ function accountassessment(periodfromtxt, periodtotxt, account, sheet1, IsMCC)
     var searchcampaignsnumber = campaignIterator.totalNumEntities();
     if (searchcampaignsnumber > 0)
       {
-       /* 
-       var searchcampaignsnumberhigh  = ''; // campaign level
-        var  pourcentcampaignhigh  = ''; //  campaign level
-        var  searchcampaignstrialnumber  = ''; //  campaign level
-        var  adGroupnumber  = ''; //  campaign level
-        var  adGroupDSAnumber  = ''; //  campaign level
-        var  adGrouphighimpressions  = '';
-        var  pourcenthighimpression  = '';
-        var  totalkeywords  = '';
-        var  lowkeywords  = '';
-        var  percentlowkeywords  = '';
-        var  totalcostaccount  = '';
-        var averageconv  = '';
-        var avstdadgroupimp  = '';
-        var landingpage  = '';
-        var ratiolp  = '';
-         */
         
 
         var campaignSelectorhigh = AdsApp.campaigns().withCondition('AdvertisingChannelType = SEARCH').withCondition('Conversions >= '+conversionsthreshold).forDateRange(periodfromto).get();
