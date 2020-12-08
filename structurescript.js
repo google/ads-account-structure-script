@@ -1,10 +1,28 @@
+/**
+ * Copyright 2020 Google LLC
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
 // Beginning of parameters
 
 var SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1lICiRmYoc_cai7l3YfGsnhnrYWUvV9any-aQQOtG3_E/edit?resourcekey=0-Pw2iJriK8AUuD-jPsNhrsA#gid=0'; //example 'https://docs.google.com/spreadsheets/d/abcd/edit#gid=0'
 var PERIOD_BEGINNING = 'default'; //example '20200101'
 var NUMBER_OF_DAYS = 7; //length of the period
 var PERIOD_COMPARISON_BEGINNING = 'disabled'; //example '20190101'
-var RESUME_AFTER_TIMEOUT = 0;
+var ACCOUNTS_ALREADY_ANALYZED = 0;
+var CAMPAIGNS_ALREADY_ANALYZED = 0
 var ACCOUNT_LIST = ['disabled']; //['xxx-xxx-xxxx','yyy-yyy-yyyy','zzz-zzz-zzzz'] // ['380-382-1780','363-250-0541'] // ['disabled']
 
 // End of parameters
@@ -34,6 +52,13 @@ function strtodate(datestr)
   return date;
 }
 
+function addWarningLabel(sheet1, total){
+      sheet1.getRange('h2:p2').merge();
+      sheet1.getRange('h2:p2').setValue('This Report is Incomplete. You are currently on account: ' + (ACCOUNTS_ALREADY_ANALYZED + 50) + ' of ' + total + '.');
+      sheet1.getRange('h2:p2').setBackground('#FF0000');
+      sheet1.getRange('h2:p2').setFontColor('white')
+}
+
 function trueurl(s)
 {
   var stop_chars = ['?', '{'];
@@ -57,11 +82,22 @@ function remDups(array)
     { if(outArray[outArray.length-1]!=array[n]) { outArray.push(array[n]); } }
   return outArray;
 }
-  
+ 
+function parallelAccountAssessment(optionalInput){
+  var account= AdsApp.currentAccount()
+  var sheet1 = SpreadsheetApp.openByUrl(SPREADSHEET_URL).getSheetByName(optionalInput);
+  var IsMCC = true;
+  accountassessment(periodfromtxt, periodtotxt, account, sheet1, IsMCC);
+}
+
+function addWarning(){
+}
+
+
 function main()
 {
-  ScriptyApp.setHeader({customerId:63103371}); // this line is only necessary in AppScript - 63103371 = Lelynx internal MCC ///. 89498466 = le lynx bank
-  var IsMCC = false
+  
+  var IsMCC = true
   try 
   {
     if (ACCOUNT_LIST[0] != 'disabled') 
@@ -76,11 +112,13 @@ function main()
     }
     else
     {
+      
     var accountSelector = AdsManagerApp
     .accounts()
     .withCondition('Impressions > 0')
     .forDateRange(periodfromto)
-    .orderBy('Cost DESC').get()
+    .orderBy('Cost DESC')
+    .withLimit(50 + ACCOUNTS_ALREADY_ANALYZED).get()
     if (accountSelector.totalNumEntities() > 1)  {  IsMCC = true }   
     } 
   } catch (e) {} 
@@ -90,7 +128,7 @@ function main()
   var accountName = currentAccount.getName();   accountName = accountName.substring(0, Math.min(30,accountName.length));
   var accountID = currentAccount.getCustomerId();
   
-  if (RESUME_AFTER_TIMEOUT == 0)
+  if (ACCOUNTS_ALREADY_ANALYZED == 0)
   {
     var sheet1 = SpreadsheetApp.openByUrl(SPREADSHEET_URL).getSheetByName(accountName+ ' ' + accountID + ' - Account structure report - Search');
     if (!sheet1) { sheet1 = SpreadsheetApp.openByUrl(SPREADSHEET_URL).insertSheet(accountName+ ' ' + accountID + ' - Account structure report - Search'); }
@@ -286,35 +324,68 @@ function main()
   }
   if (IsMCC == true) 
   {
-    if (RESUME_AFTER_TIMEOUT == 0)
+    if (ACCOUNTS_ALREADY_ANALYZED === 0)
     {
+      if (IsMCC){
+                var temp = AdsManagerApp
+    .accounts()
+    .withCondition('Impressions > 0')
+    .forDateRange(periodfromto)
+    .orderBy('Cost DESC').get()
+      var totalAccounts = temp.totalNumEntities()
+          AdsManagerApp
+    .accounts()
+    .withCondition('Impressions > 0')
+    .forDateRange(periodfromto)
+    .orderBy('Cost DESC')
+    .withLimit(50 + ACCOUNTS_ALREADY_ANALYZED).executeInParallel("parallelAccountAssessment", "addWarning", accountName+ ' ' + accountID + ' - Account structure report - Search' );
+        addWarningLabel(sheet1, totalAccounts)
+        } else {
       while (accountSelector.hasNext())
       {
         var account = accountSelector.next();
         accountassessment(periodfromtxt, periodtotxt, account, sheet1, IsMCC);
+
         if (PERIOD_COMPARISON_BEGINNING != 'disabled') { accountassessment(PERIOD_COMPARISON_BEGINNING, PERIOD_COMPARISON_END, account, sheet1, IsMCC) }
       }
-    }
-    else
+        }}
+      else
     {
       var i = 0;
-      while (i < RESUME_AFTER_TIMEOUT)
-      {
+      var customerIds = [];
+      while (i < (ACCOUNTS_ALREADY_ANALYZED + 49)){
+
         var account = accountSelector.next();
+        if (i > ACCOUNTS_ALREADY_ANALYZED){
+          customerIds.push(account.getCustomerId())
+        }
         i++;
       }
-      while (accountSelector.hasNext())
+
+      if (IsMCC){
+        AdsManagerApp.accounts().withIds(customerIds).executeInParallel("parallelAccountAssessment", "addWarning", accountName+ ' ' + accountID + ' - Account structure report - Search' );
+        var totalAccounts = temp.totalNumEntities()
+          AdsManagerApp
+    .accounts()
+    .withCondition('Impressions > 0')
+    .forDateRange(periodfromto)
+    .orderBy('Cost DESC')
+    .withLimit(50 + ACCOUNTS_ALREADY_ANALYZED).executeInParallel("parallelAccountAssessment", "addWarning", accountName+ ' ' + accountID + ' - Account structure report - Search' );
+        addWarningLabel(sheet1, totalAccounts)
+      } else {
+         while (accountSelector.hasNext())
       {
-        var account = accountSelector.next();
-        accountassessment(periodfromtxt, periodtotxt, account, sheet1, IsMCC);
-        if (PERIOD_COMPARISON_BEGINNING != 'disabled') { accountassessment(PERIOD_COMPARISON_BEGINNING, PERIOD_COMPARISON_END, account, sheet1, IsMCC) }
+          var account = accountSelector.next();
+          accountassessment(periodfromtxt, periodtotxt, account, sheet1, IsMCC);
+          if (PERIOD_COMPARISON_BEGINNING != 'disabled') { accountassessment(PERIOD_COMPARISON_BEGINNING, PERIOD_COMPARISON_END, account, sheet1, IsMCC) }
+        }
       }
     }
   }
   else
   {
    var campaignIterator = AdsApp.campaigns().withCondition('AdvertisingChannelType = SEARCH').withCondition('Impressions > 0').forDateRange(periodfromto).orderBy('Cost DESC').get();
-   if (RESUME_AFTER_TIMEOUT == 0)
+   if (CAMPAIGNS_ALREADY_ANALYZED == 0)
    {
       accountassessment(periodfromtxt, periodtotxt, currentAccount, sheet1, IsMCC);
       if (PERIOD_COMPARISON_BEGINNING != 'disabled') { accountassessment(PERIOD_COMPARISON_BEGINNING, PERIOD_COMPARISON_END, currentAccount, sheet1, IsMCC) }
@@ -332,7 +403,7 @@ function main()
     else
     {
       var i = 0;
-      while (i < RESUME_AFTER_TIMEOUT)
+      while (i < CAMPAIGNS_ALREADY_ANALYZED)
       {
         var campaign = campaignIterator.next();
         i++;
@@ -365,6 +436,23 @@ function accountassessment(periodfromtxt, periodtotxt, account, sheet1, IsMCC)
     var searchcampaignsnumber = campaignIterator.totalNumEntities();
     if (searchcampaignsnumber > 0)
       {
+       /* 
+       var searchcampaignsnumberhigh  = ''; // campaign level
+        var  pourcentcampaignhigh  = ''; //  campaign level
+        var  searchcampaignstrialnumber  = ''; //  campaign level
+        var  adGroupnumber  = ''; //  campaign level
+        var  adGroupDSAnumber  = ''; //  campaign level
+        var  adGrouphighimpressions  = '';
+        var  pourcenthighimpression  = '';
+        var  totalkeywords  = '';
+        var  lowkeywords  = '';
+        var  percentlowkeywords  = '';
+        var  totalcostaccount  = '';
+        var averageconv  = '';
+        var avstdadgroupimp  = '';
+        var landingpage  = '';
+        var ratiolp  = '';
+         */
         
 
         var campaignSelectorhigh = AdsApp.campaigns().withCondition('AdvertisingChannelType = SEARCH').withCondition('Conversions >= '+conversionsthreshold).forDateRange(periodfromto).get();
@@ -612,3 +700,4 @@ function lpreport(periodfromtxt, periodtotxt, sheet2)
              i++;
              }
 }
+
