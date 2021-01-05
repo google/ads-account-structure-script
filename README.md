@@ -107,7 +107,7 @@ In order to help identify your account structure improvement opportunities, this
 
 ## **Generating the reports**
 
-1. Create a [new Google Sheet](sheets.new)
+1. Create a [new Google Sheet](https://sheets.new)
 2. In Google Ads go to Tools & Settings → Bulk Actions → Scripts
 3. Add a new script
 4. Delete all the content in the text editor
